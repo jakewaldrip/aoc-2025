@@ -55,7 +55,7 @@ fn apply_sequence_p1(sequence: &Sequence, dial: &i32) -> i32 {
         Dir::Right => 1,
     };
     let delta = sign_mult * sequence.num;
-    (dial + delta) % 100
+    (dial + delta).rem_euclid(100)
 }
 
 fn solve_p2(sequences: &[Sequence]) -> i32 {

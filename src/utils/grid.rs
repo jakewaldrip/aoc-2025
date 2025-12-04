@@ -34,9 +34,10 @@ pub struct Point {
     pub value: u8,
 }
 
+#[derive(Clone)]
 pub struct Grid {
-    data: Vec<u8>,
-    row_size: usize,
+    pub data: Vec<u8>,
+    pub row_size: usize,
 }
 
 #[allow(dead_code)]
@@ -127,6 +128,71 @@ impl Grid {
             col: new_col,
             value: *val,
         })
+    }
+
+    pub unsafe fn get_point_in_direction_ptr(
+        &mut self,
+        point: &Point,
+        direction: &Directions,
+    ) -> Option<&mut u8> {
+        // Map each direction to its row/col offset
+        let (dr, dc) = match direction {
+            Directions::Top => (-1, 0),
+            Directions::TopRight => (-1, 1),
+            Directions::Right => (0, 1),
+            Directions::BottomRight => (1, 1),
+            Directions::Bottom => (1, 0),
+            Directions::BottomLeft => (1, -1),
+            Directions::Left => (0, -1),
+            Directions::TopLeft => (-1, -1),
+        };
+
+        // Use checked_add/sub to avoid negative indices
+        let new_row = (point.row as isize).checked_add(dr)?;
+        let new_col = (point.col as isize).checked_add(dc)?;
+
+        // Guard against negative
+        if new_row < 0 || new_col < 0 {
+            return None;
+        }
+
+        let new_row = new_row as usize;
+        let new_col = new_col as usize;
+
+        // Get a mutable pointer to the value
+        unsafe {
+            Some(
+                self.data
+                    .as_mut_ptr()
+                    .add(new_row * self.row_size + new_col)
+                    .as_mut()
+                    .unwrap(),
+            )
+        }
+    }
+
+    pub fn count_neighbors_of_value<T>(&self, point: &Point, target: u8) -> T
+    where
+        T: TryFrom<usize>,
+    {
+        let directions = [
+            Directions::Top,
+            Directions::TopRight,
+            Directions::Right,
+            Directions::BottomRight,
+            Directions::Bottom,
+            Directions::BottomLeft,
+            Directions::Left,
+            Directions::TopLeft,
+        ];
+
+        let count = directions
+            .iter()
+            .filter_map(|direction| self.get_point_in_direction(point, direction))
+            .filter(|neighbor| neighbor.value == target)
+            .count();
+
+        T::try_from(count).ok().expect("Conversion failed")
     }
 }
 

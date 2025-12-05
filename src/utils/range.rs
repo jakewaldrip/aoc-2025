@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Range {
     pub start: i64,
     pub end: i64,

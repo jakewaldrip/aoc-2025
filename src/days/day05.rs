@@ -1,9 +1,6 @@
-use std::collections::HashMap;
+use std::cmp::max;
 
-use crate::{
-    Solution, SolutionPair,
-    utils::range::{self, Range},
-};
+use crate::{Solution, SolutionPair, utils::range::Range};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -18,22 +15,23 @@ fn parse_p1(input: &str) -> (Vec<Range>, Vec<i64>) {
     (ranges, fruits)
 }
 
-fn parse_p2(input: &str) -> Vec<Range> {
-    let inputs: Vec<&str> = input.split("\n\n").collect();
-    let ranges: Vec<Range> = inputs[0]
-        .split('\n')
-        .map(|raw_range| {
-            let range = Range::from(raw_range);
-            // need to make the ranges exclusivive to focus the complexity here
-            // no overlapping in any so we can easily sum them in solve
-            todo!()
-        })
-        .collect();
-    ranges
+fn merge_ranges(original_ranges: &[Range]) -> Vec<Range> {
+    let mut merged_ranges: Vec<Range> = vec![original_ranges[0]];
+    for original_range in original_ranges.iter().skip(1) {
+        let last_range = merged_ranges.last_mut().unwrap();
+
+        if original_range.start <= last_range.end {
+            last_range.end = max(last_range.end, original_range.end);
+        } else {
+            merged_ranges.push(*original_range);
+        }
+    }
+
+    merged_ranges
 }
 
 pub fn solve(input: &str) -> SolutionPair {
-    let (ranges, fruits) = parse_p1(input);
+    let (mut ranges, fruits) = parse_p1(input);
 
     // part 1
     let sol1: usize = fruits
@@ -50,7 +48,8 @@ pub fn solve(input: &str) -> SolutionPair {
         .count();
 
     // part 2
-    let ranges = parse_p2(input);
+    ranges.sort_by_key(|range| range.start);
+    let ranges = merge_ranges(&ranges);
     let sol2: i64 = ranges.iter().map(|range| range.end - range.start + 1).sum();
 
     (Solution::from(sol1), Solution::from(sol2))

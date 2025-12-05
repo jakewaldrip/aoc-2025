@@ -14,7 +14,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_example_input_day5_p1() {
+    fn test_example_input_day9_p1() {
         let input = "";
         let (p1, _) = solve(input);
         let p1_result = format!("{p1}");

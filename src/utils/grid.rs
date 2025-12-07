@@ -81,7 +81,7 @@ impl Grid {
         &self.data
     }
 
-    pub fn _iter_rows(&self) -> impl Iterator<Item = &[u8]> {
+    pub fn iter_rows(&self) -> impl Iterator<Item = &[u8]> {
         self.data.chunks(self.row_size)
     }
 

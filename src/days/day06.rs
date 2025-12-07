@@ -2,7 +2,7 @@ use crate::{Solution, SolutionPair};
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Operands {
     Mult,
     Add,
@@ -19,16 +19,9 @@ impl From<&str> for Operands {
 }
 
 #[derive(Debug)]
-enum Alignment {
-    Left,
-    Right,
-}
-
-#[derive(Debug)]
 struct Problem {
     nums: Vec<i64>,
     operand: Operands,
-    alignment: Alignment,
 }
 
 fn parse_p1(input: &str) -> Vec<Problem> {
@@ -41,8 +34,6 @@ fn parse_p1(input: &str) -> Vec<Problem> {
         .map(|op| Problem {
             nums: Vec::new(),
             operand: Operands::from(op),
-            // Dont need for p1
-            alignment: Alignment::Left,
         })
         .collect();
 
@@ -62,7 +53,7 @@ fn parse_p1(input: &str) -> Vec<Problem> {
 }
 
 fn parse_p2(input: &str) -> Vec<Problem> {
-    let mut operands: Vec<Operands> = input
+    let operands: Vec<Operands> = input
         .lines()
         .last()
         .unwrap()
@@ -71,13 +62,55 @@ fn parse_p2(input: &str) -> Vec<Problem> {
         .map(Operands::from)
         .collect();
 
-    // need to figure out alignment of column as I encounter it, replace extra spaces with 0's,
-    // then parse into numbers and save that number into the vec of problems
-    //
-    // possibly parse with p1, get largest num of digits in line, this tells you max size of column
-    // then find the first number less than that
-    // then find that number and check something
-    todo!()
+    let original_parse = parse_p1(input);
+    let column_widths: Vec<i64> = original_parse
+        .iter()
+        .map(|problem| {
+            problem
+                .nums
+                .iter()
+                .map(|num| num.to_string().len() as i64)
+                .max()
+                .unwrap()
+        })
+        .collect();
+
+    // get number for on each column
+    let mut column_based_numbers: Vec<i64> = Vec::new();
+    let col_size = input.lines().next().unwrap().len();
+    let row_size = input.lines().count() - 1;
+
+    for i in 0..col_size {
+        let mut current_num: Vec<char> = Vec::new();
+        for j in 0..row_size {
+            let line = input.lines().nth(j).unwrap();
+            let ch = line.chars().nth(i).unwrap();
+            if ch != ' ' {
+                current_num.push(ch);
+            }
+        }
+
+        if !current_num.is_empty() {
+            let num: i64 = current_num.iter().collect::<String>().parse().unwrap();
+            column_based_numbers.push(num);
+        }
+    }
+
+    // translate column numbers into problems
+    let mut cursor = 0;
+    let mut problems: Vec<Problem> = Vec::new();
+    for (i, operand) in operands.iter().enumerate() {
+        let chunk_size = column_widths[i];
+        let chunk = column_based_numbers[cursor..cursor + chunk_size as usize].to_vec();
+        problems.push(Problem {
+            nums: chunk,
+            operand: operand.clone(),
+        });
+
+        cursor += chunk_size as usize;
+    }
+
+    problems
 }
 
 fn solve_problem(problem: &Problem) -> i64 {
@@ -100,8 +133,7 @@ pub fn solve(input: &str) -> SolutionPair {
 
     // part 2
     let all_problems_adjusted = parse_p2(input);
-    // let sol2: i64 = all_problems_adjusted.iter().map(solve_problem).sum();
-    let sol2 = 0;
+    let sol2: i64 = all_problems_adjusted.iter().map(solve_problem).sum();
 
     (Solution::from(sol1), Solution::from(sol2))
 }
@@ -122,6 +154,6 @@ mod tests {
         let input = "123 328  51 64 \n 45 64  387 23 \n  6 98  215 314\n*   +   *   +  ";
         let (_, p2) = solve(input);
         let p2_result = format!("{p2}");
-        assert_eq!(p2_result, "0");
+        assert_eq!(p2_result, "3263827");
     }
 }

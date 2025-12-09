@@ -61,6 +61,7 @@ impl Vector3 {
 
 fn build_circuits_p1(junctions: &[Vector3], distances: &[(&KeyPair, &i64)]) -> i32 {
     let mut circuits: Vec<Vec<Vector3>> = Vec::new();
+    // track what vector a circuit is in for fast lookup
     let mut vec_to_circuit: HashMap<Vector3, usize> = HashMap::new();
 
     for (keypair, _) in distances.iter().take(1000) {

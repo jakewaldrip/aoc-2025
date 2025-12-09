@@ -1,4 +1,4 @@
-use std::{collections::HashMap, iter::repeat_n};
+use std::collections::HashMap;
 
 use crate::{Solution, SolutionPair};
 
@@ -31,6 +31,65 @@ impl KeyPair {
     }
 }
 
+#[derive(Debug)]
+struct UnionFind {
+    parent: HashMap<Vector3, Vector3>,
+    rank: HashMap<Vector3, usize>,
+    size: HashMap<Vector3, usize>,
+}
+
+impl UnionFind {
+    fn new(junctions: &[Vector3]) -> Self {
+        let mut parent = HashMap::new();
+        let mut rank = HashMap::new();
+        let mut size = HashMap::new();
+
+        for &v in junctions {
+            parent.insert(v, v);
+            rank.insert(v, 0);
+            size.insert(v, 1);
+        }
+
+        Self { parent, rank, size }
+    }
+
+    fn find(&mut self, v: Vector3) -> Vector3 {
+        // Different parent, recursively find and compress path
+        if self.parent[&v] != v {
+            let parent = self.find(self.parent[&v]);
+            self.parent.insert(v, parent);
+        }
+
+        self.parent[&v]
+    }
+
+    fn union(&mut self, v1: Vector3, v2: Vector3) {
+        let parent_v1 = self.find(v1);
+        let parent_v2 = self.find(v2);
+
+        if parent_v1 == parent_v2 {
+        } else if self.rank[&parent_v1] > self.rank[&parent_v2] {
+            self.parent.insert(parent_v2, parent_v1);
+            *self.size.get_mut(&parent_v1).unwrap() += self.size[&parent_v2];
+        } else if self.rank[&parent_v2] > self.rank[&parent_v1] {
+            self.parent.insert(parent_v1, parent_v2);
+            *self.size.get_mut(&parent_v2).unwrap() += self.size[&parent_v1];
+        } else {
+            self.parent.insert(parent_v2, parent_v1);
+            *self.size.get_mut(&parent_v1).unwrap() += self.size[&parent_v2];
+            *self.rank.get_mut(&parent_v1).unwrap() += 1
+        }
+    }
+
+    fn get_sizes(&self) -> Vec<usize> {
+        self.size
+            .iter()
+            .filter(|&(k, _)| self.parent[k] == *k)
+            .map(|(_, &s)| s)
+            .collect()
+    }
+}
+
 fn create_distance_map(junctions: &[Vector3]) -> HashMap<KeyPair, i64> {
     let mut distance_map: HashMap<KeyPair, i64> = HashMap::new();
 
@@ -59,120 +118,49 @@ impl Vector3 {
     }
 }
 
+// You start with a hash map of single size circuits
+// You continue to union the circuits of each vector pair until you get 1000
 fn build_circuits_p1(junctions: &[Vector3], distances: &[(&KeyPair, &i64)]) -> i32 {
-    let mut circuits: Vec<Vec<Vector3>> = Vec::new();
-    // track what vector a circuit is in for fast lookup
-    let mut vec_to_circuit: HashMap<Vector3, usize> = HashMap::new();
-
+    let mut union_find = UnionFind::new(junctions);
     for (keypair, _) in distances.iter().take(1000) {
-        let i1 = vec_to_circuit.get(&keypair.0).copied();
-        let i2 = vec_to_circuit.get(&keypair.1).copied();
-
-        match (i1, i2) {
-            // same circuit already, skip
-            (Some(idx1), Some(idx2)) if idx1 == idx2 => continue,
-
-            // separate circuits, merge
-            (Some(idx1), Some(idx2)) => {
-                let (keep, remove) = if idx1 < idx2 {
-                    (idx1, idx2)
-                } else {
-                    (idx2, idx1)
-                };
-                let mut removed = circuits.swap_remove(remove);
-                circuits[keep].append(&mut removed);
-
-                // update hashmap for the merged circuit
-                for v in &circuits[keep] {
-                    vec_to_circuit.insert(*v, keep);
-                }
-                // update the circuit that was moved to remove index
-                if remove < circuits.len() {
-                    for v in &circuits[remove] {
-                        vec_to_circuit.insert(*v, remove);
-                    }
-                }
-            }
-
-            // v1 has a circuit, add v2
-            (Some(idx), None) => {
-                circuits[idx].push(keypair.1);
-                vec_to_circuit.insert(keypair.1, idx);
-            }
-
-            // v2 has a circuit, add v1
-            (None, Some(idx)) => {
-                circuits[idx].push(keypair.0);
-                vec_to_circuit.insert(keypair.0, idx);
-            }
-
-            // new circuit with v1 and v2
-            (None, None) => {
-                let idx = circuits.len();
-                circuits.push(vec![keypair.0, keypair.1]);
-                vec_to_circuit.insert(keypair.0, idx);
-                vec_to_circuit.insert(keypair.1, idx);
-            }
-        }
+        union_find.union(keypair.0, keypair.1);
     }
 
-    let total_connected = circuits.iter().map(|c| c.len()).sum::<usize>();
-    let num_singles = junctions.len() - total_connected;
-    let mut sizes: Vec<i32> = circuits.iter().map(|c| c.len() as i32).collect();
-    sizes.extend(repeat_n(1, num_singles));
-
+    let mut sizes: Vec<i32> = union_find
+        .get_sizes()
+        .into_iter()
+        .map(|s| s as i32)
+        .collect();
     sizes.sort_by(|a, b| b.cmp(a));
     sizes.iter().take(3).product()
 }
 
+// You start with a hashmap of single sized circuits
+// You union the circuits until .find tells you you're unioning the last two
+// You then capture the value we need from the keypair and break
 fn build_circuits_p2(junctions: &[Vector3], distances: &[(&KeyPair, &i64)]) -> i64 {
-    let mut circuits: Vec<Vec<Vector3>> = junctions.iter().map(|&v| vec![v]).collect();
-    // track what vector a circuit is in for fast lookup
-    // start with single circuits to track those
-    let mut vec_to_circuit: HashMap<Vector3, usize> =
-        junctions.iter().enumerate().map(|(i, &v)| (v, i)).collect();
-    let mut last_coord_hash = 0;
+    // Track number of circuits
+    let mut circuits = junctions.len();
+    let mut union_find = UnionFind::new(junctions);
 
     for (keypair, _) in distances.iter() {
-        let i1 = vec_to_circuit.get(&keypair.0).copied();
-        let i2 = vec_to_circuit.get(&keypair.1).copied();
+        // Find the root for both vectors
+        let v1 = union_find.find(keypair.0);
+        let v2 = union_find.find(keypair.1);
 
-        match (i1, i2) {
-            // same circuit already, skip
-            (Some(idx1), Some(idx2)) if idx1 == idx2 => continue,
+        // They have different roots, union them
+        if v1 != v2 {
+            circuits -= 1;
+            union_find.union(v1, v2);
 
-            // separate circuits, merge
-            (Some(idx1), Some(idx2)) => {
-                last_coord_hash = keypair.0.x * keypair.1.x;
-                let (keep, remove) = if idx1 < idx2 {
-                    (idx1, idx2)
-                } else {
-                    (idx2, idx1)
-                };
-                let mut removed = circuits.swap_remove(remove);
-                circuits[keep].append(&mut removed);
-
-                // update hashmap for the merged circuit
-                for v in &circuits[keep] {
-                    vec_to_circuit.insert(*v, keep);
-                }
-                // update the circuit that was moved to remove index
-                if remove < circuits.len() {
-                    for v in &circuits[remove] {
-                        vec_to_circuit.insert(*v, remove);
-                    }
-                }
+            // We've unioned the last pair to make a single circuit
+            if circuits == 1 {
+                return keypair.0.x * keypair.1.x;
             }
-
-            _ => unreachable!(), // since all are initialized
-        }
-
-        if circuits.len() == 1 {
-            break;
         }
     }
 
-    last_coord_hash
+    0
 }
 
 pub fn solve(input: &str) -> SolutionPair {

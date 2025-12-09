@@ -125,17 +125,65 @@ fn build_circuits_p1(junctions: &[Vector3], distances: &[(&KeyPair, &i64)]) -> i
     sizes.iter().take(3).product()
 }
 
+fn build_circuits_p2(junctions: &[Vector3], distances: &[(&KeyPair, &i64)]) -> i64 {
+    let mut circuits: Vec<Vec<Vector3>> = junctions.iter().map(|&v| vec![v]).collect();
+    // track what vector a circuit is in for fast lookup
+    // start with single circuits to track those
+    let mut vec_to_circuit: HashMap<Vector3, usize> =
+        junctions.iter().enumerate().map(|(i, &v)| (v, i)).collect();
+    let mut last_coord_hash = 0;
+
+    for (keypair, _) in distances.iter() {
+        let i1 = vec_to_circuit.get(&keypair.0).copied();
+        let i2 = vec_to_circuit.get(&keypair.1).copied();
+
+        match (i1, i2) {
+            // same circuit already, skip
+            (Some(idx1), Some(idx2)) if idx1 == idx2 => continue,
+
+            // separate circuits, merge
+            (Some(idx1), Some(idx2)) => {
+                last_coord_hash = keypair.0.x * keypair.1.x;
+                let (keep, remove) = if idx1 < idx2 {
+                    (idx1, idx2)
+                } else {
+                    (idx2, idx1)
+                };
+                let mut removed = circuits.swap_remove(remove);
+                circuits[keep].append(&mut removed);
+
+                // update hashmap for the merged circuit
+                for v in &circuits[keep] {
+                    vec_to_circuit.insert(*v, keep);
+                }
+                // update the circuit that was moved to remove index
+                if remove < circuits.len() {
+                    for v in &circuits[remove] {
+                        vec_to_circuit.insert(*v, remove);
+                    }
+                }
+            }
+
+            _ => unreachable!(), // since all are initialized
+        }
+
+        if circuits.len() == 1 {
+            break;
+        }
+    }
+
+    last_coord_hash
+}
+
 pub fn solve(input: &str) -> SolutionPair {
     let junctions: Vec<Vector3> = input.lines().map(Vector3::from).collect();
     let distance_map = create_distance_map(&junctions);
     let mut distances: Vec<_> = distance_map.iter().collect();
     distances.sort_by_key(|&(_, v)| v);
 
-    // part 1
     let sol1 = build_circuits_p1(&junctions, &distances);
+    let sol2 = build_circuits_p2(&junctions, &distances);
 
-    // part 2
-    let sol2 = 0;
     (Solution::from(sol1), Solution::from(sol2))
 }
 

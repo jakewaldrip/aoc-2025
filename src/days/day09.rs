@@ -21,8 +21,8 @@ impl From<&str> for Point {
 }
 
 fn get_area(p1: &Point, p2: &Point) -> i64 {
-    let width = (p1.x - p2.x + 1).abs();
-    let height = (p1.y - p2.y + 1).abs();
+    let width = (p1.x - p2.x).abs() + 1;
+    let height = (p1.y - p2.y) + 1;
     width * height
 }
 

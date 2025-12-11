@@ -1,3 +1,5 @@
+use std::iter::zip;
+
 use crate::{Solution, SolutionPair};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -56,11 +58,57 @@ impl From<&str> for Machine {
     }
 }
 
+pub fn calc_all_subsets(strings: &[String]) -> Vec<Vec<String>> {
+    let n = strings.len();
+    let mut result = Vec::new();
+
+    for mask in 1..(1 << n) {
+        let mut subset = Vec::new();
+        for (j, val) in strings.iter().enumerate() {
+            if (mask & (1 << j)) != 0 {
+                subset.push(val.clone());
+            }
+        }
+        result.push(subset);
+    }
+    result
+}
+
+fn binary_xor(x: &str, y: &str) -> String {
+    zip(x.chars(), y.chars())
+        .map(|(x, y)| ((x as u8 - b'0') ^ ((y as u8 - b'0') + b'0')) as char)
+        .collect()
+}
+
+fn get_lowest_button_presses_p1(machine: &Machine) -> i32 {
+    let subsets = calc_all_subsets(&machine.buttons);
+    let min_presses = subsets
+        .iter()
+        .filter_map(|candidate| {
+            let mut current_machine_state = "0".repeat(machine.target.len()).to_string();
+            for button_presses in candidate {
+                current_machine_state = binary_xor(&current_machine_state, button_presses);
+            }
+
+            if current_machine_state == machine.target {
+                return Some(candidate.len());
+            }
+
+            None
+        })
+        .min()
+        .unwrap();
+
+    min_presses as i32
+}
+
 pub fn solve(input: &str) -> SolutionPair {
-    println!("Input: \n{input}");
     let machines: Vec<Machine> = input.lines().map(|line| line.into()).collect();
-    println!("Machines:\n{machines:#?}");
-    let sol1 = 0;
+
+    // part 1
+    let sol1: i32 = machines.iter().map(get_lowest_button_presses_p1).sum();
+
+    // part 2
     let sol2 = 0;
     (Solution::from(sol1), Solution::from(sol2))
 }
@@ -75,5 +123,31 @@ mod tests {
         let (p1, _) = solve(input);
         let p1_result = format!("{p1}");
         assert_eq!(p1_result, "7");
+    }
+
+    #[test]
+    fn test_binary_xor() {
+        let x = "0110";
+        let y = "1111";
+        let result = binary_xor(x, y);
+        assert_eq!(result, "1001");
+    }
+
+    #[test]
+    fn test_three_elements() {
+        let input = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let mut result = calc_all_subsets(&input);
+        println!("All subsets\n{result:#?}");
+        result.sort_by(|a, b| a.len().cmp(&b.len()).then(a.cmp(b)));
+        let expected = vec![
+            vec!["a".to_string()],
+            vec!["b".to_string()],
+            vec!["c".to_string()],
+            vec!["a".to_string(), "b".to_string()],
+            vec!["a".to_string(), "c".to_string()],
+            vec!["b".to_string(), "c".to_string()],
+            vec!["a".to_string(), "b".to_string(), "c".to_string()],
+        ];
+        assert_eq!(result, expected);
     }
 }
